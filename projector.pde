@@ -1,6 +1,7 @@
 import ipcapture.*;
 
 IPCapture cam;
+PImage camera_image;
 
 String ROS_TOPIC = "/input_image";
 
@@ -22,7 +23,12 @@ void setup() {
 void draw() {
   if (cam.isAvailable()) {
     cam.read();
-    image(cam,0,0);
+    
+    image(cam, 0, 0);
+    // blur and threshold
+    filter(BLUR, 6);
+    filter(THRESHOLD, 0.5);
+    
   }
 }
 
