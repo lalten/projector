@@ -11,11 +11,9 @@ import cv2
 from sensor_msgs.msg import Image, CompressedImage
 from cv_bridge import CvBridge, CvBridgeError
 
-import bargraphs
+from bargraphs import Bargraphs
 
 import screeninfo
-
-# from src.game.bargraphs import Bargraphs
 
 
 class Projector:
@@ -87,19 +85,18 @@ class Projector:
 
         composite_image_with_text = cv2.putText(composite_image, str(percent_matched)+"%", (10,100), cv2.FONT_HERSHEY_COMPLEX, 1.0, (255,255,255))
 
-        # composite_image_with_text_and_bargraphs = Bargraphs.drawHealthBar(self.health)
-
-
-        composite_image_fullscreen = cv2.resize(composite_image_with_text, (1920, 1200))
-
+        composite_image_with_text_and_bargraphs = Bargraphs.drawHealthBar(composite_image_with_text, self.health)
+        composite_image_with_text_and_bargraphs = Bargraphs.drawProgressBar(composite_image_with_text_and_bargraphs, self.progress)
 
 
         # publish as ros topic
-        self.image_pub.publish(self.bridge.cv2_to_imgmsg(composite_image_with_text, encoding="bgr8"))
-        self.image_pub_compressed.publish(self.bridge.cv2_to_compressed_imgmsg(composite_image_with_text))
+        self.image_pub.publish(self.bridge.cv2_to_imgmsg(composite_image_with_text_and_bargraphs, encoding="bgr8"))
+        self.image_pub_compressed.publish(self.bridge.cv2_to_compressed_imgmsg(composite_image_with_text_and_bargraphs))
 
 
+        composite_image_fullscreen = cv2.resize(composite_image_with_text_and_bargraphs, (1920, 1200))
         cv2.imshow(self.window_name, composite_image_fullscreen)
+
         key = cv2.waitKey(1)
         if key == 32:
             print('save')
