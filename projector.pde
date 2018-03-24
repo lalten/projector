@@ -1,25 +1,34 @@
-// Step 1. Import the video library.
-import processing.video.*;
+import ipcapture.*;
 
-//Step 2. Declare a capture object.
-Capture video;
+IPCapture cam;
 
-// Step 5. Read from the camera when a new image is available!
-void captureEvent(Capture video) {
-  video.read();
+String ROS_TOPIC = "/input_image";
+
+void setup() {
+  size(640,480);
+  cam = new IPCapture(this, "http://localhost:8080/stream?topic="+ROS_TOPIC+"&height=480&widht=640&type=mjpeg", "", "");
+  cam.start();
+  
+  // this works as well:
+  
+  // cam = new IPCapture(this);
+  // cam.start("url", "username", "password");
+  
+  // It is possible to change the MJPEG stream by calling stop()
+  // on a running camera, and then start() it with the new
+  // url, username and password.
 }
 
-void setup() {  
-  size(320, 240);
-  
-  // Step 3. Initialize Capture object.
-  video = new Capture(this, 320, 240);
-  
-  // Step 4. Start the capturing process.
-  video.start();
+void draw() {
+  if (cam.isAvailable()) {
+    cam.read();
+    image(cam,0,0);
+  }
 }
 
-// Step 6. Display the image.
-void draw() {  
-image(video, 0, 0);
+void keyPressed() {
+  if (key == ' ') {
+    if (cam.isAlive()) cam.stop();
+    else cam.start();
+  }
 }
