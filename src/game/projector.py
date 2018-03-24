@@ -11,7 +11,12 @@ import cv2
 from sensor_msgs.msg import Image, CompressedImage
 from cv_bridge import CvBridge, CvBridgeError
 
+import bargraphs
+
 import screeninfo
+
+# from src.game.bargraphs import Bargraphs
+
 
 class Projector:
 
@@ -27,6 +32,8 @@ class Projector:
         # cv2.setWindowProperty(self.window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
         self.level_image = self.load_level(1)
+        self.health = 100.0
+        self.progress = 0.0
 
         self.image_sub = rospy.Subscriber("/CloudGateWay/flat/image", Image, self.input_callback)
         self.image_pub = rospy.Publisher("/game_window", Image, queue_size=1)
@@ -38,7 +45,7 @@ class Projector:
         img = cv2.imread(filename)
         if img is None:
             rospy.logerr('level img from file \''+filename+'\' is None')
-            exit(1)
+            return np.zeros((300,480), dtype=np.uint8)
         img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         return img_gray
 
@@ -61,7 +68,8 @@ class Projector:
         num_inside_pixels_missed = cv2.countNonZero(inside_pixels_missed)
         num_outside_pixels_toomuch = cv2.countNonZero(outside_pixels_toomuch)
         num_level_and_input = cv2.countNonZero(level_and_input)
-        percent_matched = int(round(100.0 * num_level_and_input / (num_level_and_input + num_inside_pixels_missed + num_outside_pixels_toomuch)))
+        sum = (num_level_and_input + num_inside_pixels_missed + num_outside_pixels_toomuch)
+        percent_matched = int(round(100.0 * num_level_and_input / sum)) if sum != 0 else 0
 
         # color these pixels
         level_and_input = cv2.cvtColor(level_and_input, cv2.COLOR_GRAY2BGR)
@@ -79,7 +87,12 @@ class Projector:
 
         composite_image_with_text = cv2.putText(composite_image, str(percent_matched)+"%", (10,100), cv2.FONT_HERSHEY_COMPLEX, 1.0, (255,255,255))
 
+        # composite_image_with_text_and_bargraphs = Bargraphs.drawHealthBar(self.health)
+
+
         composite_image_fullscreen = cv2.resize(composite_image_with_text, (1920, 1200))
+
+
 
         # publish as ros topic
         self.image_pub.publish(self.bridge.cv2_to_imgmsg(composite_image_with_text, encoding="bgr8"))
@@ -98,7 +111,7 @@ class Projector:
             print(key)
 
 def main(args):
-    rospy.init_node('Projector')
+    rospy.init_node('game')
     rospy.loginfo('started node')
     p = Projector()
     # try:
