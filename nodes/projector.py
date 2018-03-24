@@ -51,13 +51,12 @@ class Projector:
         # blur and threshold input image
         input_image_gray = cv2.cvtColor(input_image, cv2.COLOR_BGR2GRAY)
         blurred = cv2.blur(input_image_gray, (6, 6))
-        ret,thresholded = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY)
-        # diff_img = cv2.absdiff(self.level_image, thresholded)
+        ret,input_image_gray = cv2.threshold(blurred, 127, 255, cv2.THRESH_BINARY)
 
         # level_or_input = cv2.bitwise_or(self.level_image, thresholded)
-        level_and_input = cv2.bitwise_and(self.level_image, thresholded)
+        level_and_input = cv2.bitwise_and(self.level_image, input_image_gray)
         inside_pixels_missed = self.level_image - level_and_input
-        outside_pixels_toomuch = thresholded - level_and_input
+        outside_pixels_toomuch = input_image_gray - level_and_input
 
         num_inside_pixels_missed = cv2.countNonZero(inside_pixels_missed)
         num_outside_pixels_toomuch = cv2.countNonZero(outside_pixels_toomuch)
@@ -65,7 +64,7 @@ class Projector:
         percent_matched = int(round(100.0 * num_level_and_input / (num_level_and_input + num_inside_pixels_missed + num_outside_pixels_toomuch)))
 
         # color these pixels
-        level_and_input = cv2.cvtColor(inside_pixels_missed, cv2.COLOR_GRAY2BGR)
+        level_and_input = cv2.cvtColor(level_and_input, cv2.COLOR_GRAY2BGR)
         inside_pixels_missed = cv2.cvtColor(inside_pixels_missed, cv2.COLOR_GRAY2BGR)
         outside_pixels_toomuch = cv2.cvtColor(outside_pixels_toomuch, cv2.COLOR_GRAY2BGR)
         inside_pixels_missed[np.where((inside_pixels_missed == [255, 255, 255]).all(axis=2))] \
@@ -83,7 +82,7 @@ class Projector:
         composite_image_fullscreen = cv2.resize(composite_image_with_text, (1920, 1200))
 
         # publish as ros topic
-        self.image_pub.publish(self.bridge.cv2_to_imgmsg(composite_image_with_text))
+        self.image_pub.publish(self.bridge.cv2_to_imgmsg(composite_image_with_text, encoding="bgr8"))
         self.image_pub_compressed.publish(self.bridge.cv2_to_compressed_imgmsg(composite_image_with_text))
 
 
@@ -91,8 +90,8 @@ class Projector:
         key = cv2.waitKey(1)
         if key == 32:
             print('save')
-            cv2.imwrite('level.png', thresholded)
-            self.level_image = thresholded
+            cv2.imwrite('level.png', input_image_gray)
+            self.level_image = input_image_gray
         elif key == 27:
             exit(0)
         elif key != -1:
@@ -100,6 +99,7 @@ class Projector:
 
 def main(args):
     rospy.init_node('Projector')
+    rospy.loginfo('started node')
     p = Projector()
     # try:
     rospy.spin()

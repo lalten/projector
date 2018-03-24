@@ -19,7 +19,7 @@ window_is_open_(false)
   black_img_ = cv::Mat(img_size_.height, img_size_.width, CV_8UC1);
   black_img_.setTo(0);
   
-  img_sub_ = nh_private_.subscribe("/camera/rgb/image_raw", 1, &ImageScreen::img_cb_, this);
+  img_sub_ = nh_private_.subscribe("/game_window", 1, &ImageScreen::img_cb_, this);
   toggle_sub_ = nh_private_.subscribe("activate", 1, &ImageScreen::toggle_cb_, this);
   toggle_sub_ = nh_private_.subscribe("black", 1, &ImageScreen::black_cb_, this);
   
