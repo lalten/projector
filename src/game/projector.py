@@ -30,8 +30,12 @@ class Projector:
         # cv2.setWindowProperty(self.window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
         self.level_image = self.load_level(1)
-        self.health = 90.0
-        self.progress = 20.0
+        self.health = 100.0
+        self.progress = 0.0
+
+        self.health_loss_per_second = -1.0
+
+        self.last_update_time = None
 
         self.image_sub = rospy.Subscriber("/CloudGateWay/flat/image", Image, self.input_callback)
         self.image_pub = rospy.Publisher("/game_window", Image, queue_size=1)
@@ -52,6 +56,10 @@ class Projector:
             input_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
         except CvBridgeError as e:
             print(e)
+
+        now = rospy.get_time()
+        if self.last_update_time is None:
+            self.last_update_time = now
 
         # blur and threshold input image
         input_image_gray = cv2.cvtColor(input_image, cv2.COLOR_BGR2GRAY)
@@ -85,6 +93,12 @@ class Projector:
 
         composite_image_with_text = cv2.putText(composite_image, str(percent_matched)+"%", (10,100), cv2.FONT_HERSHEY_COMPLEX, 1.0, (255,255,255))
 
+        # calculate health and progress
+        time_since_last_update = now - self.last_update_time
+        self.health += self.health_loss_per_second * time_since_last_update
+        self.last_update_time = now
+
+        # draw health and progress bars
         composite_image_with_text_and_bargraphs = Bargraphs.drawHealthBar(composite_image_with_text, self.health)
         composite_image_with_text_and_bargraphs = Bargraphs.drawProgressBar(composite_image_with_text_and_bargraphs, self.progress)
 
