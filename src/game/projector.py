@@ -30,8 +30,8 @@ class Projector:
         # cv2.setWindowProperty(self.window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
         self.level_image = self.load_level(1)
-        self.health = 100.0
-        self.progress = 0.0
+        self.health = 90.0
+        self.progress = 20.0
 
         self.image_sub = rospy.Subscriber("/CloudGateWay/flat/image", Image, self.input_callback)
         self.image_pub = rospy.Publisher("/game_window", Image, queue_size=1)
