@@ -1,8 +1,6 @@
-# projector
+# CanYouDoWhatICanDo
+
+An interactive art installation game, develeoped during the [Rethink Hackathon at ZKM's Open Codes exhibition](https://opencodes.io/).
 
 ## Install
-* Processing
-* [Processing video library beta](https://github.com/processing/processing-video/releases)
-* https://github.com/atduskgreg/opencv-processing/releases
-* https://github.com/GT-RAIL/async_web_server_cpp
-* https://github.com/RobotWebTools/web_video_server
+* ROS
