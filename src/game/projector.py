@@ -28,12 +28,14 @@ class Projector:
         self.GS_GAME_WON = 4
 
         self.game_state = self.GS_WAITING
-        # self.game_state = self.GS_GAME_WON
+        # self.game_state = self.GS_GAME_LOST
 
         self.bridge = CvBridge()
 
         self.level_base_directory = "/home/laurenz/catkin_ws/src/projector/levels/"
         self.window_name = "window"
+        cv2.namedWindow(self.window_name, cv2.WINDOW_AUTOSIZE)
+        # cv2.startWindowThread()
 
         self.levels = list()
         self.current_level_id = -1
@@ -44,10 +46,10 @@ class Projector:
         self.game_lost_screen = cv2.imread(self.level_base_directory+'gameover.png')
         self.game_lost_display_time = 5.0
         self.you_win_screen = cv2.imread(self.level_base_directory+'youwin.png')
-        self.you_win_display_time = 10.0
+        self.you_win_display_time = 20.0
 
         self.progress = 0.0
-        self.good_match_percentage = 40
+        self.good_match_percentage = 60
         self.good_state = False
         self.progress_step = 20
         self.max_progress = 100.0
@@ -55,13 +57,14 @@ class Projector:
         self.draw_health_bars = False
         self.health = 100.0
         self.initial_health = 100.0
-        self.health_loss_per_second = -1.0
+        self.health_loss_per_second = -2.0
         self.health_boost_level = 10
 
         self.last_update_time = None
 
         self.composite_image = None
         self.input_image_gray = None
+        self.input_image_background = None
 
         self.image_sub = rospy.Subscriber("/CloudGateWay/flat/image", Image, self.input_callback)
         self.image_pub = rospy.Publisher("/game_window", Image, queue_size=1)
@@ -102,6 +105,7 @@ class Projector:
     def start_next_level(self):
         assert self.game_state == self.GS_GAME_RUNNING
         self.current_level_id += 1
+        self.level_start_time = rospy.Time.now()
         if self.current_level_id == self.total_level_count():
             print ("GAME WAS FINISHED AFTER %i LEVELS" % self.current_level_id)
             self.draw_health_bars = False
@@ -111,7 +115,6 @@ class Projector:
         print("Loading level %i" % self.current_level_id)
         self.level_image = self.levels[self.current_level_id]
         self.health = min(self.health + self.health_boost_level, self.initial_health)
-        self.level_start_time = rospy.Time.now()
         self.progress = 0
 
         return True
@@ -133,11 +136,12 @@ class Projector:
         input_image_gray = cv2.cvtColor(input_image, cv2.COLOR_BGR2GRAY)
         blurred = cv2.blur(input_image_gray, (6, 6))
         ret, self.input_image_gray = cv2.threshold(blurred, 127, 255, cv2.THRESH_BINARY)
+        self.input_image_background = cv2.inRange(blurred, 1, 60)
 
         # level_or_input = cv2.bitwise_or(self.level_image, thresholded)
-        level_and_input = cv2.bitwise_and(self.level_image, input_image_gray)
+        level_and_input = cv2.bitwise_and(self.level_image, self.input_image_gray)
         inside_pixels_missed = self.level_image - level_and_input
-        outside_pixels_toomuch = input_image_gray - level_and_input
+        outside_pixels_toomuch = self.input_image_gray - level_and_input
 
         num_inside_pixels_missed = cv2.countNonZero(inside_pixels_missed)
         num_outside_pixels_toomuch = cv2.countNonZero(outside_pixels_toomuch)
@@ -156,7 +160,12 @@ class Projector:
         level_and_input[np.where((level_and_input == [255, 255, 255]).all(axis=2))] \
             = [0, 255, 0]
 
-        composite_image = cv2.add(inside_pixels_missed, outside_pixels_toomuch)
+        # background first:
+        composite_image = cv2.cvtColor(self.input_image_background, cv2.COLOR_GRAY2BGR)
+
+        # add color layers
+        composite_image = cv2.add(composite_image, outside_pixels_toomuch)
+        composite_image = cv2.add(composite_image, inside_pixels_missed)
         composite_image = cv2.add(composite_image, level_and_input)
 
         self.composite_image = cv2.putText(composite_image, str(percent_matched)+"%", (10,100), cv2.FONT_HERSHEY_COMPLEX, 1.0, (255,255,255))
@@ -172,7 +181,8 @@ class Projector:
         if self.game_state == self.GS_GAME_RUNNING:
             self.draw_health_bars = True
             if (now-self.level_start_time).to_sec() < 3.0:
-                print("3sec grace period")
+                # print("3sec grace period")
+                pass
             else:
                 self.good_state = percent_matched > self.good_match_percentage
                 # print("Good state: %i" % good_state)
@@ -184,8 +194,8 @@ class Projector:
 
         if self.composite_image is None:
             # we're not ready yet
-            # return
-            pass
+            return
+            # pass
 
         now = rospy.Time.now()
         if self.last_update_time is None:
@@ -196,7 +206,8 @@ class Projector:
             self.health += self.health_loss_per_second * time_since_last_update
 
             self.progress += (1 if self.good_state else -1) * self.progress_step * time_since_last_update
-            print("Progress: %f" % self.progress)
+            self.progress = max(self.progress, 0)
+            # print("Progress: %f" % self.progress)
             if self.progress > self.max_progress:
                 print("Level won")
                 self.start_next_level()
@@ -253,19 +264,17 @@ class Projector:
         self.image_pub.publish(self.bridge.cv2_to_imgmsg(final_image, encoding="bgr8"))
         self.image_pub_compressed.publish(self.bridge.cv2_to_compressed_imgmsg(final_image))
 
+        # resize and show bigger on local screen
+        # final_image_fullscreen = cv2.resize(final_image, (1920, 1200))
+        # cv2.imshow(self.window_name, final_image_fullscreen)
 
-        final_image_fullscreen = cv2.resize(final_image, (1920, 1200))
-        cv2.imshow(self.window_name, final_image_fullscreen)
-
-        key = cv2.waitKey(1)
-        if key == 32 and self.input_image_gray is not None:
+        # check if we want a save
+        do_store = rospy.get_param("~store", False)
+        if do_store:
+            rospy.set_param("~store", False)
             print('save')
-            cv2.imwrite('level.png', self.input_image_gray)
+            cv2.imwrite('level_save_'+str(rospy.Time.now().to_sec())+'.png', self.input_image_gray)
             self.level_image = self.input_image_gray
-        elif key == 27:
-            exit(0)
-        elif key != -1:
-            print(key)
 
     def timer_callback(self, event):
         self.redraw()
