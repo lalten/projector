@@ -43,22 +43,26 @@ class Projector:
         self.initial_level = cv2.imread(self.level_base_directory+'/single/0.png')
         self.level_image = cv2.cvtColor(self.initial_level, cv2.COLOR_BGR2GRAY)
 
+        self.start_game_screen = cv2.imread(self.level_base_directory+'startgame.png')
         self.game_lost_screen = cv2.imread(self.level_base_directory+'gameover.png')
         self.game_lost_display_time = 5.0
         self.you_win_screen = cv2.imread(self.level_base_directory+'youwin.png')
         self.you_win_display_time = 20.0
+        self.heart_icon = cv2.imread(self.level_base_directory+'heart.png')
+        self.flash_icon = cv2.imread(self.level_base_directory+'flash.png')
 
         self.progress = 0.0
-        self.good_match_percentage = 60
-        self.good_state = False
-        self.progress_step = 20
+        self.good_match_percentage = 50
+        self.progress_step = 0
+        self.progress_step_max = 30
         self.max_progress = 100.0
+        self.percent_matched = 0
 
         self.draw_health_bars = False
         self.health = 100.0
         self.initial_health = 100.0
-        self.health_loss_per_second = -2.0
-        self.health_boost_level = 10
+        self.health_loss_per_second = -5.0
+        self.health_boost_level = 20.0
 
         self.last_update_time = None
 
@@ -76,6 +80,9 @@ class Projector:
     def read_levels_from_file(self, single_player=True):
         level_directory = self.level_base_directory + "single/" if single_player else "multi/"
         onlyfiles = [f for f in listdir(level_directory) if isfile(join(level_directory, f))]
+
+        onlyfiles = sorted(onlyfiles)
+        print(onlyfiles)
 
         self.levels = list()
         for local_name in onlyfiles:
@@ -101,9 +108,14 @@ class Projector:
         self.current_level_id = -1
         self.start_next_level()
 
+    def stop_game(self):
+        self.game_state = self.GS_WAITING
+        self.health = self.initial_health
+        self.current_level_id = -1
+        self.start_next_level()
+
 
     def start_next_level(self):
-        assert self.game_state == self.GS_GAME_RUNNING
         self.current_level_id += 1
         self.level_start_time = rospy.Time.now()
         if self.current_level_id == self.total_level_count():
@@ -147,7 +159,7 @@ class Projector:
         num_outside_pixels_toomuch = cv2.countNonZero(outside_pixels_toomuch)
         num_level_and_input = cv2.countNonZero(level_and_input)
         sum = (num_level_and_input + num_inside_pixels_missed + num_outside_pixels_toomuch)
-        percent_matched = int(round(100.0 * num_level_and_input / sum)) if sum != 0 else 0
+        self.percent_matched = int(round(100.0 * num_level_and_input / sum)) if sum != 0 else 0
 
         # color these pixels
         level_and_input = cv2.cvtColor(level_and_input, cv2.COLOR_GRAY2BGR)
@@ -161,31 +173,21 @@ class Projector:
             = [0, 255, 0]
 
         # background first:
-        composite_image = cv2.cvtColor(self.input_image_background, cv2.COLOR_GRAY2BGR)
+        self.composite_image = cv2.cvtColor(self.input_image_background, cv2.COLOR_GRAY2BGR)
 
         # add color layers
-        composite_image = cv2.add(composite_image, outside_pixels_toomuch)
-        composite_image = cv2.add(composite_image, inside_pixels_missed)
-        composite_image = cv2.add(composite_image, level_and_input)
+        self.composite_image = cv2.add(self.composite_image, outside_pixels_toomuch)
+        self.composite_image = cv2.add(self.composite_image, inside_pixels_missed)
+        self.composite_image = cv2.add(self.composite_image, level_and_input)
 
-        self.composite_image = cv2.putText(composite_image, str(percent_matched)+"%", (10,100), cv2.FONT_HERSHEY_COMPLEX, 1.0, (255,255,255))
 
         if self.game_state == self.GS_WAITING:
             self.draw_health_bars = False
             # checking for filled shape:
-            if percent_matched > 40:
+            if self.percent_matched > 40:
                 # TODO: single or multi player
                 print("Starting Game, counting players")
                 self.start_game(single_player=True)
-
-        if self.game_state == self.GS_GAME_RUNNING:
-            self.draw_health_bars = True
-            if (now-self.level_start_time).to_sec() < 3.0:
-                # print("3sec grace period")
-                pass
-            else:
-                self.good_state = percent_matched > self.good_match_percentage
-                # print("Good state: %i" % good_state)
 
         self.redraw()
 
@@ -195,19 +197,41 @@ class Projector:
         if self.composite_image is None:
             # we're not ready yet
             return
-            # pass
+
+        final_image = self.composite_image
 
         now = rospy.Time.now()
         if self.last_update_time is None:
             self.last_update_time = now
         time_since_last_update = (now - self.last_update_time).to_sec()
 
-        if self.game_state == self.GS_GAME_RUNNING:
-            self.health += self.health_loss_per_second * time_since_last_update
+        if self.game_state == self.GS_WAITING:
+            blink_state_visible = ((now - self.level_start_time).to_sec() % 1.0) < 0.7
+            if blink_state_visible:
+                ret, game_screen_mask = cv2.threshold(self.start_game_screen, 127, 255, cv2.THRESH_BINARY_INV)
+                final_image = cv2.bitwise_and(self.composite_image, game_screen_mask)
+                final_image = cv2.add(final_image, self.start_game_screen)
+                # final_image = cv2.putText(final_image, str(self.percent_matched)+"%", (50,30), cv2.FONT_HERSHEY_COMPLEX, 1.0, (255,255,255))
 
-            self.progress += (1 if self.good_state else -1) * self.progress_step * time_since_last_update
+
+        if self.game_state == self.GS_GAME_RUNNING:
+            blink_state_visible = ((now - self.level_start_time).to_sec() % 0.4) < 0.2
+            if (now-self.level_start_time).to_sec() < 2.0:
+                self.draw_health_bars = blink_state_visible
+            else:
+                self.draw_health_bars = True
+                self.progress_step = \
+                    min( max(self.percent_matched - self.good_match_percentage, -self.progress_step_max), self.progress_step_max)
+                self.health += self.health_loss_per_second * time_since_last_update
+
+            self.progress += self.progress_step * time_since_last_update
             self.progress = max(self.progress, 0)
-            # print("Progress: %f" % self.progress)
+
+            final_image = cv2.putText(final_image, "Cover: "+str(self.percent_matched) + "%", (50, 30), cv2.FONT_HERSHEY_COMPLEX,
+                                      0.5, (255, 255, 255))
+            final_image = cv2.putText(final_image, "Level: "+str(self.current_level_id+1)+"/"+str(self.total_level_count()),
+                                      (50,50), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255,255,255))
+
             if self.progress > self.max_progress:
                 print("Level won")
                 self.start_next_level()
@@ -219,11 +243,18 @@ class Projector:
                 self.game_state = self.GS_GAME_LOST
 
         # calculate health and progress
-        final_image = self.composite_image
         if self.draw_health_bars:
             # draw health and progress bars
             final_image = Bargraphs.drawHealthBar(final_image, self.health)
             final_image = Bargraphs.drawProgressBar(final_image, self.progress)
+            y_offset = 15
+            x_offset = 11
+            final_image[y_offset:y_offset+self.heart_icon.shape[0],
+                x_offset:x_offset + self.heart_icon.shape[1]] = self.heart_icon
+            y_offset = 15
+            x_offset = 31
+            final_image[y_offset:y_offset+self.flash_icon.shape[0],
+                x_offset:x_offset + self.flash_icon.shape[1]] = self.flash_icon
 
         if self.game_state == self.GS_GAME_LOST:
             max_rand = 4
@@ -245,7 +276,7 @@ class Projector:
             game_lost_screen_shifted = cv2.merge((channel_b, channel_g, channel_r))
             final_image = game_lost_screen_shifted
             if now > self.level_start_time + rospy.Duration(self.game_lost_display_time):
-                self.game_state = self.GS_WAITING
+                self.stop_game()
 
         if self.game_state == self.GS_GAME_WON:
             game_won_shifted = cv2.cvtColor(self.you_win_screen, cv2.COLOR_BGR2HSV)
@@ -255,7 +286,7 @@ class Projector:
             game_won_shifted = cv2.merge((channel_h, channel_s, channel_v))
             final_image = cv2.cvtColor(game_won_shifted, cv2.COLOR_HSV2BGR)
             if now > self.level_start_time + rospy.Duration(self.game_lost_display_time):
-                self.game_state = self.GS_WAITING
+                self.stop_game()
 
         self.last_update_time = now
 
@@ -283,7 +314,7 @@ def main(args):
     rospy.init_node('game')
     rospy.loginfo('started node')
     p = Projector()
-    rospy.Timer(rospy.Duration(1.0/30), p.timer_callback)
+    rospy.Timer(rospy.Duration(1.0/60), p.timer_callback)
     rospy.spin()
     cv2.destroyAllWindows()
 
