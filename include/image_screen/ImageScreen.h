@@ -5,6 +5,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <std_msgs/Bool.h>
 #include <std_msgs/Empty.h>
+#include <mutex>
 
 class ImageScreen
 {
@@ -16,9 +17,12 @@ public:
   void show_image(const cv::Mat& img);
   void close_image_window();
   
-private:
-  ros::NodeHandle nh_private_;
+  
+  ros::Time last_image_callback_;
   ros::Subscriber img_sub_;
+  
+// private:
+  ros::NodeHandle nh_private_;
   ros::Subscriber toggle_sub_;
   ros::Subscriber black_sub_;
   std::string display_name_;
@@ -30,4 +34,6 @@ private:
   void toggle_cb_(const std_msgs::BoolConstPtr& msg);
   void open_image_window();
   void img_cb_(const sensor_msgs::ImageConstPtr& msg);
+  
+  void reconnect();
 };

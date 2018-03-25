@@ -19,15 +19,22 @@ window_is_open_(false)
   black_img_ = cv::Mat(img_size_.height, img_size_.width, CV_8UC1);
   black_img_.setTo(0);
   
-  img_sub_ = nh_private_.subscribe("/game_window", 1, &ImageScreen::img_cb_, this);
-  toggle_sub_ = nh_private_.subscribe("activate", 1, &ImageScreen::toggle_cb_, this);
-  toggle_sub_ = nh_private_.subscribe("black", 1, &ImageScreen::black_cb_, this);
+  reconnect();
   
   open_image_window();
   cv::imshow(display_name_, black_img_);
   cv::waitKey(1);
 }
 
+
+void ImageScreen::reconnect()
+{
+  last_image_callback_ = ros::Time::now();
+  img_sub_ = nh_private_.subscribe("/game_window", 1, &ImageScreen::img_cb_, this);
+  toggle_sub_ = nh_private_.subscribe("activate", 1, &ImageScreen::toggle_cb_, this);
+  toggle_sub_ = nh_private_.subscribe("black", 1, &ImageScreen::black_cb_, this);
+  
+}
 
 void ImageScreen::black_cb_(const std_msgs::EmptyConstPtr& msg)
 {
@@ -84,6 +91,9 @@ void ImageScreen::set_black()
 
 void ImageScreen::img_cb_(const sensor_msgs::ImageConstPtr& msg)
 {
+  last_image_callback_ = ros::Time::now();
+  ROS_INFO_STREAM("img_cb_ reached");
+  
   cv_bridge::CvImageConstPtr cv_ptr;
   
   try
@@ -111,6 +121,18 @@ int main(int argc, char** argv)
   ros::init(argc, argv, "image_screen");
 
   ImageScreen screen;
+  while(ros::ok())
+  {
+    auto now = ros::Time::now();
+    if(screen.last_image_callback_ != ros::Time(0) && now - screen.last_image_callback_ > ros::Duration(2))
+    {
+      ROS_FATAL_STREAM("Last image callback was at " << screen.last_image_callback_ << ", killing");
+      return EXIT_FAILURE;
+    }
+    ros::spinOnce();
+    ros::Rate(10.0).sleep();
+  }
+  
   ros::spin();
   return EXIT_SUCCESS;
 }
