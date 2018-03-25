@@ -13,7 +13,6 @@ from cv_bridge import CvBridge, CvBridgeError
 
 from bargraphs import Bargraphs
 
-# import screeninfo
 from os import listdir
 from os.path import isfile, join
 
@@ -30,19 +29,11 @@ class Projector:
         self.game_state = self.GS_WAITING
         # Load first Level
 
-
         self.bridge = CvBridge()
 
         self.level_base_directory = "/home/laurenz/catkin_ws/src/projector/levels/"
         self.window_name = "window"
-        # get the size of the screen
-        # screen_id = 1
-        # screen = screeninfo.get_monitors()[screen_id]
-        # cv2.namedWindow(self.window_name, cv2.WND_PROP_FULLSCREEN)
-        # cv2.moveWindow(self.window_name, screen.x - 1, screen.y - 1)
-        # cv2.setWindowProperty(self.window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
-        # self.level_image = None  # self.load_level(1)  #  for Waiting state
         self.health = 100.0
         self.progress = 0.0
         self.levels = list()
@@ -55,7 +46,6 @@ class Projector:
         self.initial_health = 100.0
 
         self.health_loss_per_second = -1.0
-        # self.time_since_last_update = None
 
         self.last_update_time = None
 
@@ -83,7 +73,6 @@ class Projector:
                 # return np.zeros((300, 480), dtype=np.uint8)
             print(full_path)
             img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            #return img_gray
             self.levels.append(img_gray)
             print ("Loaded %i levels from %s" % (self.total_level_count(), level_directory))
 
