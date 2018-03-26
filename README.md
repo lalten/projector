@@ -1,6 +1,6 @@
 # CanYouDoWhatICanDo
 
-An interactive art installation game, develeoped during the [Rethink Hackathon](https://opencodes.io/) at the [ZKM](http://zkm.de/)'s [Open Codes exhibition](https://open-codes.zkm.de/de).
+An interactive art installation game, developed during the [Rethink Hackathon](https://opencodes.io/) at the [ZKM](http://zkm.de/)'s [Open Codes exhibition](https://open-codes.zkm.de/de).
 
 Winner of [CAS Software AG](cas.de)'s "Connecting People" Category.
 
