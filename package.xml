@@ -2,16 +2,23 @@
 <package format="2">
   <name>projector</name>
   <version>0.0.0</version>
-  <description>The projector package</description>
+  <description>The projector package </description>
 
   <maintainer email="laurenz@acrai.de">Laurenz Altenmueller</maintainer>
-  
+  <maintainer email="engelhard@magazino.eu">Nikolas Engelhard</maintainer>
+
   <license>MIT</license>
   
   <buildtool_depend>catkin</buildtool_depend>
-  <depend>roscpp</depend>
   <depend>std_msgs</depend>
   <depend>cv_bridge</depend>
+  <depend>eigen_conversions</depend>
+  <depend>image_transport</depend>
+  <depend>pcl_ros</depend>
+  <depend>roscpp</depend>
+  <depend>tf2_ros</depend>
+
+
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>
@@ -19,3 +26,6 @@
 
   </export>
 </package>
+
+
+
