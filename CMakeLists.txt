@@ -16,6 +16,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 find_package(OpenCV REQUIRED core imgproc highgui)
 
+catkin_python_setup()
 catkin_package()
 
 ## Specify additional locations of header files
@@ -50,6 +51,9 @@ target_link_libraries(cloud_gateway
 install(TARGETS  image_screen cloud_gateway
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
+
+install(PROGRAMS src/projector/nodes/game.py
+        DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION} )
 
 
 

@@ -12,7 +12,7 @@ import random
 from sensor_msgs.msg import Image, CompressedImage
 from cv_bridge import CvBridge, CvBridgeError
 
-from bargraphs import Bargraphs
+from projector.bargraphs import Bargraphs
 
 from os import listdir
 from os.path import isfile, join
@@ -312,9 +312,9 @@ class Projector:
 
 def main(args):
     rospy.init_node('game')
-    rospy.loginfo('started node')
+    rospy.loginfo('Started Game')
     p = Projector()
-    rospy.Timer(rospy.Duration(1.0/60), p.timer_callback)
+    rospy.Timer(rospy.Duration(1.0/60), p.timer_callback, oneshot=False)
     rospy.spin()
     cv2.destroyAllWindows()
 
