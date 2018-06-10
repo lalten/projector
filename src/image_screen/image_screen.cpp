@@ -5,15 +5,22 @@
 #include <std_msgs/Empty.h>
 #include "image_screen/ImageScreen.h"
 
+#include <iostream>
+#include <fstream>
 
 ImageScreen::ImageScreen():
 nh_private_("~"),
 display_name_("projection_window"),
-window_is_open_(false)
+debug_(false),
+window_is_open_(false),
+corner_file_path_("/tmp/tetris_corners.txt")
 {
   nh_private_.param<int>("/projector_width", img_size_.width, 1920);
   nh_private_.param<int>("/projector_height", img_size_.height, 1200);
-  
+  nh_private_.param<bool>("/debug", debug_, false);
+
+  read_corners_();
+
   ROS_INFO("Expecting projector size of  %i %i", img_size_.width, img_size_.height);
   
   black_img_ = cv::Mat(img_size_.height, img_size_.width, CV_8UC1);
@@ -30,10 +37,12 @@ window_is_open_(false)
 void ImageScreen::reconnect()
 {
   last_image_callback_ = ros::Time::now();
-  img_sub_ = nh_private_.subscribe("/game_window", 1, &ImageScreen::img_cb_, this);
+//  img_sub_ = nh_private_.subscribe("/game_window", 1, &ImageScreen::img_cb_, this);
+
+  img_sub_ = nh_private_.subscribe("/usb_cam/image_raw", 1, &ImageScreen::img_cb_, this);
+
   toggle_sub_ = nh_private_.subscribe("activate", 1, &ImageScreen::toggle_cb_, this);
   toggle_sub_ = nh_private_.subscribe("black", 1, &ImageScreen::black_cb_, this);
-  
 }
 
 void ImageScreen::black_cb_(const std_msgs::EmptyConstPtr& msg)
@@ -53,6 +62,122 @@ void ImageScreen::toggle_cb_(const std_msgs::BoolConstPtr& msg)
   }
 }
 
+
+
+void mouseCB(int event, int x, int y, int flags, void* userdata)
+{
+//ROS_INFO("%i %i", x, y);
+  ImageScreen* is = (ImageScreen*) userdata;
+
+  if  ( event == cv::EVENT_LBUTTONUP )
+  {
+    if (is->corners.size() < 4)
+    {
+      is->corners.push_back(cv::Point2f(x, y));
+    } else {
+      // update closest point
+      float min_dist = 1e6;
+      int best_ndx = -1;
+
+      for (int i=0; i<is->corners.size(); ++i)
+      {
+        const cv::Point2f& p = is->corners[i];
+        float d = abs(p.x-x)+abs(p.y-y);
+        if (d < min_dist || best_ndx < 0)
+        {
+          best_ndx = i;
+          min_dist = d;
+        }
+      }
+
+      is->corners[best_ndx] = cv::Point2f(x, y);
+    }
+    is->corner_trigger();
+  }
+
+
+
+//
+
+
+//    else if  ( event == EVENT_RBUTTONDOWN )
+//    {
+//        cout << "Right button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
+//    }
+//    else if  ( event == EVENT_MBUTTONDOWN )
+//    {
+//        cout << "Middle button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
+//    }
+//    else if ( event == EVENT_MOUSEMOVE )
+//    {
+//        cout << "Mouse move over the window - position (" << x << ", " << y << ")" << endl;
+//    }
+}
+
+
+void ImageScreen::write_corners_()
+{
+  std::ofstream myfile;
+  myfile.open (corner_file_path_);
+
+  for (int i=0; i<corners.size(); ++i)
+  {
+    myfile << corners[i].x << "  " << corners[i].y << std::endl;
+  }
+
+  myfile.close();
+}
+
+void ImageScreen::read_corners_()
+{
+  std::ifstream infile(corner_file_path_);
+  corners.clear();
+  float a, b;
+  while (infile >> a >> b)
+  {
+    corners.push_back(cv::Point2f(a, b));
+  }
+  corner_trigger();
+}
+
+void ImageScreen::corner_trigger()
+
+{
+  cv::Mat img = cv::Mat(img_size_.height, img_size_.width, CV_8UC3);
+  img.setTo(cv::Scalar(255,0,0));
+
+
+  if (corners.size() == 4)
+  {
+    cv::Mat cat_img = cv::imread("/home/engelhard/catkin_ws/src/projector/cat.jpeg");
+    int w = cat_img.cols;
+    int h = cat_img.rows;
+    std::vector<cv::Point2f> input;
+    input.push_back(cv::Point2f(0,0));
+    input.push_back(cv::Point2f(w,0));
+    input.push_back(cv::Point2f(w,h));
+    input.push_back(cv::Point2f(0,h));
+
+    write_corners_();
+
+    cv::Mat warpMatrix = cv::getPerspectiveTransform(input, corners);
+    cv::warpPerspective(cat_img, img, warpMatrix, cv::Size(640, 480));
+  }
+
+  for (int i = 0; i < corners.size(); ++i) {
+    cv::circle(img, corners[i], 20, cv::Scalar(0,0,255), 3);
+  }
+
+  for (int i=0; i<corners.size(); ++i)
+  {
+    cv::line(img, corners[i], corners[(i+1)%corners.size()], cv::Scalar(0, 255, 0));
+  }
+
+  cv::imshow(display_name_, img);
+  cv::waitKey(1);
+}
+
+
 void ImageScreen::open_image_window()
 {
   if (window_is_open_)
@@ -61,8 +186,14 @@ void ImageScreen::open_image_window()
   
   ROS_INFO("Opening window");
   cv::namedWindow(display_name_, CV_WINDOW_NORMAL); // CV_WINDOW_AUTOSIZE);
-  cv::moveWindow(display_name_, 1920*1.5, 100);
-  cv::setWindowProperty(display_name_,CV_WND_PROP_FULLSCREEN, CV_WINDOW_FULLSCREEN);
+
+  cv::setMouseCallback(display_name_, mouseCB, this);
+
+  if (!debug_)
+  {
+    cv::moveWindow(display_name_, 1920*1.5, 100);
+    cv::setWindowProperty(display_name_,CV_WND_PROP_FULLSCREEN, CV_WINDOW_FULLSCREEN);
+  }
   cv::waitKey(10);
 }
 
@@ -89,6 +220,7 @@ void ImageScreen::set_black()
 }
 
 
+
 void ImageScreen::img_cb_(const sensor_msgs::ImageConstPtr& msg)
 {
   last_image_callback_ = ros::Time::now();
@@ -106,11 +238,32 @@ void ImageScreen::img_cb_(const sensor_msgs::ImageConstPtr& msg)
     ROS_ERROR("cv_bridge exception: %s", e.what());
     return;
   }
-  
-  show_image(cv_ptr->image);
-  // cv::imwrite("/tmp/received.jpg", cv_ptr->image);
-  // cv::imshow(display_name_, cv_ptr->image);
-  // cv::waitKey(2);
+
+
+  /// compute warp matrix (todo: only if input size changed)
+  const cv::Mat& img = cv_ptr->image;
+
+  if (corners.size() == 4)
+  {
+    int w = img.cols;
+    int h = img.rows;
+    std::vector<cv::Point2f> input;
+    input.push_back(cv::Point2f(0,0));
+    input.push_back(cv::Point2f(w,0));
+    input.push_back(cv::Point2f(w,h));
+    input.push_back(cv::Point2f(0,h));
+
+    cv::Mat warpMatrix = cv::getPerspectiveTransform(input, corners);
+
+    black_img_.copyTo(output_img_);
+
+    cv::warpPerspective(img, output_img_, warpMatrix, cv::Size(640, 480));
+    show_image(output_img_);
+  }else
+  {
+    show_image(img);
+  }
+
 }
 
 
@@ -124,13 +277,14 @@ int main(int argc, char** argv)
   while(ros::ok())
   {
     auto now = ros::Time::now();
-    if(screen.last_image_callback_ != ros::Time(0) && now - screen.last_image_callback_ > ros::Duration(2))
-    {
-      ROS_FATAL_STREAM("Last image callback was at " << screen.last_image_callback_ << ", killing");
-      return EXIT_FAILURE;
-    }
+//    if(screen.last_image_callback_ != ros::Time(0) && now - screen.last_image_callback_ > ros::Duration(2))
+//    {
+//      ROS_FATAL_STREAM("Last image callback was at " << screen.last_image_callback_ << ", killing");
+//      return EXIT_FAILURE;
+//    }
     ros::spinOnce();
     ros::Rate(10.0).sleep();
+    cv::waitKey(1);
   }
   
   ros::spin();
