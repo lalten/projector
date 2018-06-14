@@ -70,7 +70,9 @@ class Projector:
         self.input_image_gray = None
         self.input_image_background = None
 
-        self.image_sub = rospy.Subscriber("/CloudGateWay/flat/image", Image, self.input_callback)
+       # self.image_sub = rospy.Subscriber("/CloudGateWay/flat/image", Image, self.input_callback)
+        self.image_sub = rospy.Subscriber("/camera/depth/image_raw", Image, self.input_callback)
+
         self.image_pub = rospy.Publisher("/game_window", Image, queue_size=1)
         self.image_pub_compressed = rospy.Publisher("/game_window/compressed", CompressedImage, queue_size=1)
 
@@ -134,27 +136,76 @@ class Projector:
         return True
 
     def input_callback(self, data):
+
+
+        # version with CloudGateWay
+        # try:
+        #     input_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
+        # except CvBridgeError as e:
+        #     print(e)
+        #     assert False
+        #     return
+        #
+        # now = rospy.Time.now()
+        # if self.last_update_time is None:
+        #     self.last_update_time = now
+        #
+        # # blur and threshold input image
+        #
         try:
-            input_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
+            input_image = self.bridge.imgmsg_to_cv2(data, "passthrough")
         except CvBridgeError as e:
             print(e)
             assert False
             return
 
-        now = rospy.Time.now()
-        if self.last_update_time is None:
-            self.last_update_time = now
+        # input_image_gray = cv2.cvtColor(input_image, cv2.COLOR_BGR2GRAY)
 
-        # blur and threshold input image
-        input_image_gray = cv2.cvtColor(input_image, cv2.COLOR_BGR2GRAY)
-        blurred = cv2.blur(input_image_gray, (6, 6))
-        ret, self.input_image_gray = cv2.threshold(blurred, 127, 255, cv2.THRESH_BINARY)
-        self.input_image_background = cv2.inRange(blurred, 1, 60)
+        # input_image_gray = input_image / 8
+        # print (np.min(input_image_gray), np.max(input_image_gray))
+        # # cv2.imshow(self.window_name, input_image)
+        # # cv2.waitKey(10)
+        # # print input_image[0][0]
+
+        w, h = self.level_image.shape
+
+        # input_image is given in mm
+        t_near = 500  # 2m
+        t_far = 1800  # 4m
+
+        input_image = cv2.resize(input_image, (h, w))
+        # input_image = cv2.blur(input_image, (11,11))
+
+        self.input_image_gray = cv2.inRange(input_image, t_near, t_far)
+        # self.input_image_gray = cv2.erode(self.input_image_background, np.ones((5,5), np.uint8), iterations=1)
+
+        too_close = cv2.inRange(input_image, 0, t_near)
+        too_far = cv2.inRange(input_image, t_far, 1e6)
+        self.input_image_background = cv2.bitwise_or(too_far, too_close)
+        self.input_image_background /= 5
+        # self.input_image_background = cv2.threshold(input_image, t_far, 50, cv2.THRESH_BINARY)
+
+        # cv2.imwrite("/tmp/back.png", self.input_image_background)
+
+
+
+        # print(self.input_image_gray.shape)
+        # print(self.level_image.shape)
+        # print(self.level_image.dtype)
+
+
+        # blurred = cv2.blur(input_image_gray, (6, 6))
+        # ret, self.input_image_gray = cv2.threshold(blurred, 127, 255, cv2.THRESH_BINARY)
+        # self.input_image_background = cv2.inRange(blurred, 1, 60)
 
         # level_or_input = cv2.bitwise_or(self.level_image, thresholded)
         level_and_input = cv2.bitwise_and(self.level_image, self.input_image_gray)
         inside_pixels_missed = self.level_image - level_and_input
         outside_pixels_toomuch = self.input_image_gray - level_and_input
+
+        # cv2.imwrite("/tmp/and.png", level_and_input)
+        # cv2.imwrite("/tmp/missed.png", inside_pixels_missed)
+        # cv2.imwrite("/tmp/toomuch.png", outside_pixels_toomuch)
 
         num_inside_pixels_missed = cv2.countNonZero(inside_pixels_missed)
         num_outside_pixels_toomuch = cv2.countNonZero(outside_pixels_toomuch)
@@ -173,13 +224,20 @@ class Projector:
         level_and_input[np.where((level_and_input == [255, 255, 255]).all(axis=2))] \
             = [0, 255, 0]
 
+
         # background first:
         self.composite_image = cv2.cvtColor(self.input_image_background, cv2.COLOR_GRAY2BGR)
+        # self.composite_image = cv2.cvtColor(self.input_image_background, cv2.COLOR_GRAY2BGR)
+
+
+        # return
 
         # add color layers
         self.composite_image = cv2.add(self.composite_image, outside_pixels_toomuch)
         self.composite_image = cv2.add(self.composite_image, inside_pixels_missed)
         self.composite_image = cv2.add(self.composite_image, level_and_input)
+
+
 
         if self.game_state == self.GS_WAITING:
             self.draw_health_bars = False
