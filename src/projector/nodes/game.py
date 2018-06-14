@@ -14,7 +14,7 @@ from cv_bridge import CvBridge, CvBridgeError
 
 from projector.bargraphs import Bargraphs
 
-from os import listdir
+from os import listdir, environ
 from os.path import isfile, join
 
 
@@ -32,9 +32,9 @@ class Projector:
 
         self.bridge = CvBridge()
 
-        self.level_base_directory = "/home/laurenz/catkin_ws/src/projector/levels/"
+        self.level_base_directory =environ['HOME']+"/catkin_ws/src/projector/levels/"
         self.window_name = "window"
-        cv2.namedWindow(self.window_name, cv2.WINDOW_AUTOSIZE)
+        # cv2.namedWindow(self.window_name, cv2.WINDOW_AUTOSIZE)
         # cv2.startWindowThread()
 
         self.levels = list()
@@ -73,6 +73,8 @@ class Projector:
         self.image_sub = rospy.Subscriber("/CloudGateWay/flat/image", Image, self.input_callback)
         self.image_pub = rospy.Publisher("/game_window", Image, queue_size=1)
         self.image_pub_compressed = rospy.Publisher("/game_window/compressed", CompressedImage, queue_size=1)
+
+        rospy.loginfo("Projector was created")
 
     def total_level_count(self):
         return len(self.levels)
@@ -132,7 +134,6 @@ class Projector:
         return True
 
     def input_callback(self, data):
-
         try:
             input_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
         except CvBridgeError as e:

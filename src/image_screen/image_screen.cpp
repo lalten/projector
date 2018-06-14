@@ -159,7 +159,7 @@ void ImageScreen::corner_trigger()
     write_corners_();
 
     cv::Mat warpMatrix = cv::getPerspectiveTransform(input, corners);
-    cv::warpPerspective(cat_img, img, warpMatrix, cv::Size(640, 480));
+    cv::warpPerspective(cat_img, img, warpMatrix, img_size_);
   }
 
   for (int i = 0; i < corners.size(); ++i) {
@@ -259,7 +259,9 @@ void ImageScreen::img_cb_(const sensor_msgs::ImageConstPtr& msg)
     show_image(output_img_);
   }else
   {
-    show_image(img);
+    cv::Mat resized;
+    cv::resize(img, resized, img_size_);
+    show_image(resized);
   }
 
 }
