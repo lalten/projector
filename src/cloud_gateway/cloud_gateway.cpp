@@ -4,8 +4,12 @@
 
 #include <cloud_gateway/cloud_gateway.h>
 
-#include <pcl_conversions/pcl_conversions.h>
+//#include <pcl_conversions/pcl_conversions.h>
 
+#include <tf2_ros/buffer_client.h>
+#include <tf/tf.h>
+#include <eigen_conversions/eigen_msg.h>
+#include <pcl/common/transforms.h>
 
 CloudGateway::CloudGateway():
     nh_private_("~"),
@@ -28,7 +32,7 @@ CloudGateway::CloudGateway():
     {
         if (!buffer_client.waitForServer(ros::Duration(1)))
         {
-            ROS_WARN("No server at /tf2_buffer_server (needed for bin_picking_tools/CloudTransformer");
+            ROS_WARN("No server at /tf2_buffer_server");
         }
         tfs = buffer_client.lookupTransform("ASD", "camera_depth_optical_frame", ros::Time(0), ros::Duration(5.0));
     }
@@ -49,8 +53,6 @@ void CloudGateway::cloud_cb(const sensor_msgs::PointCloud2ConstPtr &msg)
     pcl::fromROSMsg(*msg, cloud);
 
     std::string in_frame = cloud.header.frame_id;
-//    bin_picking_tools::CloudTransformer ctf;
-//    ctf.transform_to_frame(cloud, "ASD");
     pcl::transformPointCloud(cloud, cloud, eigen_t);
 
     cloud.header.frame_id = in_frame;

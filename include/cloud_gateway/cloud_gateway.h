@@ -3,13 +3,12 @@
 
 
 #include <actionlib/server/simple_action_server.h>
-#include <advanced_actionlib/advanced_action_server.h>
 #include <ros/ros.h>
 #include <ros/service_server.h>
 #include <std_srvs/Trigger.h>
 #include <pcl_ros/point_cloud.h>
 #include <pcl/octree/octree.h>
-#include <bin_picking_tools/bin_picking_tools.h>
+
 
 #include <ros/ros.h>
 #include <image_transport/image_transport.h>

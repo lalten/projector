@@ -180,7 +180,6 @@ class Projector:
         self.composite_image = cv2.add(self.composite_image, inside_pixels_missed)
         self.composite_image = cv2.add(self.composite_image, level_and_input)
 
-
         if self.game_state == self.GS_WAITING:
             self.draw_health_bars = False
             # checking for filled shape:
@@ -190,7 +189,6 @@ class Projector:
                 self.start_game(single_player=True)
 
         self.redraw()
-
 
     def redraw(self):
 
@@ -212,7 +210,6 @@ class Projector:
                 final_image = cv2.bitwise_and(self.composite_image, game_screen_mask)
                 final_image = cv2.add(final_image, self.start_game_screen)
                 # final_image = cv2.putText(final_image, str(self.percent_matched)+"%", (50,30), cv2.FONT_HERSHEY_COMPLEX, 1.0, (255,255,255))
-
 
         if self.game_state == self.GS_GAME_RUNNING:
             blink_state_visible = ((now - self.level_start_time).to_sec() % 0.4) < 0.2
