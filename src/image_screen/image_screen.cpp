@@ -18,6 +18,10 @@ corner_file_path_("/tmp/tetris_corners.txt")
   nh_private_.param<int>("/projector_width", img_size_.width, 1920);
   nh_private_.param<int>("/projector_height", img_size_.height, 1200);
   nh_private_.param<bool>("/debug", debug_, false);
+  if (debug_)
+  {
+    ROS_INFO("Running in debug mode");
+  }
 
   read_corners_();
 
@@ -117,9 +121,14 @@ void mouseCB(int event, int x, int y, int flags, void* userdata)
 
 void ImageScreen::write_corners_()
 {
+  if (corners.size() != 4)
+  {
+    ROS_INFO("Not writing current corners (size is %zu)", corners.size());
+    return;
+  }
+
   std::ofstream myfile;
   myfile.open (corner_file_path_);
-
   for (int i=0; i<corners.size(); ++i)
   {
     myfile << corners[i].x << "  " << corners[i].y << std::endl;
@@ -146,10 +155,17 @@ void ImageScreen::corner_trigger()
   cv::Mat img = cv::Mat(img_size_.height, img_size_.width, CV_8UC3);
   img.setTo(cv::Scalar(255,0,0));
 
-
   if (corners.size() == 4)
   {
-    cv::Mat cat_img = cv::imread("/home/engelhard/catkin_ws/src/projector/cat.jpeg");
+    std::string cat_path(std::getenv("HOME"));
+    cat_path += "/catkin_ws/src/projector/cat.jpeg";
+    cv::Mat cat_img = cv::imread(cat_path);
+    if (cat_img.empty())
+    {
+      ROS_WARN("Could not find test image at '%s'", cat_path.c_str());
+      return;
+    }
+
     int w = cat_img.cols;
     int h = cat_img.rows;
     std::vector<cv::Point2f> input;
