@@ -98,24 +98,6 @@ void mouseCB(int event, int x, int y, int flags, void* userdata)
     }
     is->corner_trigger();
   }
-
-
-
-//
-
-
-//    else if  ( event == EVENT_RBUTTONDOWN )
-//    {
-//        cout << "Right button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
-//    }
-//    else if  ( event == EVENT_MBUTTONDOWN )
-//    {
-//        cout << "Middle button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
-//    }
-//    else if ( event == EVENT_MOUSEMOVE )
-//    {
-//        cout << "Mouse move over the window - position (" << x << ", " << y << ")" << endl;
-//    }
 }
 
 
@@ -207,8 +189,8 @@ void ImageScreen::open_image_window()
 
   if (!debug_)
   {
-    cv::moveWindow(display_name_, 1920*1.5, 100);
-    cv::setWindowProperty(display_name_,CV_WND_PROP_FULLSCREEN, CV_WINDOW_FULLSCREEN);
+    // cv::moveWindow(display_name_, 1920*1.5, 100);
+    cv::setWindowProperty(display_name_, CV_WND_PROP_FULLSCREEN, CV_WINDOW_FULLSCREEN);
   }
   cv::waitKey(10);
 }
@@ -240,7 +222,7 @@ void ImageScreen::set_black()
 void ImageScreen::img_cb_(const sensor_msgs::ImageConstPtr& msg)
 {
   last_image_callback_ = ros::Time::now();
-  ROS_INFO_STREAM("img_cb_ reached");
+  // ROS_INFO_STREAM("img_cb_ reached");
   
   cv_bridge::CvImageConstPtr cv_ptr;
   
@@ -273,7 +255,7 @@ void ImageScreen::img_cb_(const sensor_msgs::ImageConstPtr& msg)
 
     black_img_.copyTo(output_img_);
 
-    cv::warpPerspective(img, output_img_, warpMatrix, cv::Size(640, 480));
+    cv::warpPerspective(img, output_img_, warpMatrix, img_size_);
     show_image(output_img_);
   }else
   {
